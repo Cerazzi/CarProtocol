@@ -1,5 +1,7 @@
 #include "mbed.h"
 
+#define SERVO_MOVE  flags.bit.bit0
+
 void OnRxchar(); //cada vez que recibe un caracter salta a esta interrupcion 
 int Decode(uint8_t index); //Me devuelve 1 si la cabecera va bien , 0 si hay algun error
 
@@ -13,6 +15,20 @@ typedef enum{
     SERVO = 0xA2,
 } _eEstadoMEFcmd;
 
+typedef union{
+    struct{
+        uint8_t bit0 : 1;
+        uint8_t bit1 : 1;
+        uint8_t bit2 : 1;
+        uint8_t bit3 : 1;
+        uint8_t bit4 : 1;
+        uint8_t bit5 : 1;
+        uint8_t bit6 : 1;
+        uint8_t bit7 : 1;
+    } bit;
+    uint8_t byte;
+} _uflags;
+
 PwmOut servo(PA_8);
 DigitalOut LED(PC_13);
 DigitalOut TRIGGER(PB_13);
@@ -20,26 +36,31 @@ InterruptIn ECHO(PB_12);
 RawSerial Pc(PA_9, PA_10);
 BusIn Pulsadores(PA_4, PA_5, PA_6, PA_7);
 
-Timer myTimer;
-
 volatile uint8_t rxData[256],RindexW,RindexR; //tdo lo que se usa como interrupcion deberia ser volatile ,este es el buffer
 volatile uint8_t txData[256],TindexW,TindexR;
+
 uint8_t ID, length, cks;
+
+uint32_t servoTime=0;
+
+Timer myTimer;
+_uflags flags;
 
 int main(){
     uint32_t move=0,counter=0,intervalo=100,mask=21;
-    bool ServoMove=false;
     myTimer.start();
     TindexR=0;
     TindexW=0;
+    SERVO_MOVE = false;
+
     Pc.baud(115200); //protocolo para pasarle info al micro t=1/11520
     Pc.attach(&OnRxchar,SerialBase::RxIrq); //interrupcion para llamar al onrxchar
     servo.period_ms(20);
 
     servo.pulsewidth_us(2500);
-    wait_ms(300);
+    wait_ms(350);
     servo.pulsewidth_us(500);
-    wait_ms(300);
+    wait_ms(350);
     servo.pulsewidth_us(1500);
 
 
@@ -60,9 +81,10 @@ int main(){
                 Pc.putc(txData[TindexR++]);
         }
 
-        if(servoMove == true){
-            if ((myTimer.read_ms()-ServoTime)>100){
-                servoMove=false;
+        if(SERVO_MOVE == true){
+            if ((myTimer.read_ms()-servoTime)>250){
+                servoTime = myTimer.read_ms();
+                SERVO_MOVE = false;
             }
         }
         
@@ -144,6 +166,7 @@ int Decode(uint8_t index){
 
 void decodeData(uint8_t index){
     uint8_t bufAux[20], indiceAux=0;
+    int8_t aux;
     #define NBYTES  4
 
     bufAux[indiceAux++]='U';
@@ -172,14 +195,19 @@ void decodeData(uint8_t index){
         break;
     case SERVO:
         bufAux[indiceAux++]=SERVO;
-        if(servoMove = false){
-            servo.pulsewidth_us(bufAux[(indiceAux++ * 2500)/90]);
-            ServoTime = myTimer.read_ms;
-            servoMove = true;
+        aux = bufAux[indiceAux];
+        if(SERVO_MOVE == false){
+            if(aux <= 0)
+                aux = (((aux + 90) * 1000) / 90) + 500;
+            else
+                aux = ((aux * 1000) / 90) + 1500;
+            servo.pulsewidth_us(aux);
+            servoTime = myTimer.read_ms();
+            SERVO_MOVE = true;
         }
-        bufAux[indiceAux++]=servo.read();
         bufAux[indiceAux++]=0x0D;
-        bufAux[NBYTES]=0x03;
+        bufAux[indiceAux++]=0x0A;
+        bufAux[NBYTES]=0x04;
         break;
     default:
         bufAux[indiceAux++]=0xFF;
