@@ -104,19 +104,19 @@ int Decode(uint8_t index){
         switch (header){
         case 0:
             if(rxData[RindexR]=='U')
-                header=1;
+                header = 1;
             break;
         case 1:
             if(rxData[RindexR]=='N')
-            header=2;
+            header = 2;
             else{
-                header=0;
+                header = 0;
                 RindexR--;
             }
             break;
         case 2:
             if(rxData[RindexR]=='E')
-            header=3;
+            header = 3;
             else{
                 header=0;
                 RindexR--;
@@ -124,7 +124,7 @@ int Decode(uint8_t index){
             break;
         case 3:
             if(rxData[RindexR]=='R')
-            header=4;
+            header = 4;
             else{
                 header=0;
                 RindexR--;
@@ -132,12 +132,12 @@ int Decode(uint8_t index){
             break;
         case 4:
             length = rxData[RindexR];
-            header=5;
+            header = 5;
             break;
         case 5:
             if(rxData[RindexR]==':'){
-            ind=RindexR+1;// me quedo con la posición en donde está el ID
-            header=6;
+            ind = RindexR+1;// me quedo con la posición en donde está el ID
+            header = 6;
             cks = 'U' ^ 'N' ^ 'E' ^ 'R' ^ length ^ ':';
             }else{
                 header=0;
@@ -149,7 +149,7 @@ int Decode(uint8_t index){
             if(length!=0)
                 cks ^= rxData[RindexR];
             else{
-                if(cks ==rxData[RindexR])
+                if(cks == rxData[RindexR])
                     decodeData(ind);
                 header=0;
                 RindexR--;
@@ -166,7 +166,6 @@ int Decode(uint8_t index){
 
 void decodeData(uint8_t index){
     uint8_t bufAux[20], indiceAux=0;
-    int8_t aux;
     #define NBYTES  4
 
     bufAux[indiceAux++]='U';
@@ -195,13 +194,8 @@ void decodeData(uint8_t index){
         break;
     case SERVO:
         bufAux[indiceAux++]=SERVO;
-        aux = bufAux[indiceAux];
         if(SERVO_MOVE == false){
-            if(aux <= 0)
-                aux = (((aux + 90) * 1000) / 90) + 500;
-            else
-                aux = ((aux * 1000) / 90) + 1500;
-            servo.pulsewidth_us(aux);
+            servo.pulsewidth_us(((((int8_t)rxData[index+1]) * 1000) / 90) + 1500);
             servoTime = myTimer.read_ms();
             SERVO_MOVE = true;
         }

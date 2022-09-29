@@ -17,6 +17,7 @@ void Dialog::on_pushButton_clicked()
 {
     Deg = ui->lineEdit->text().toInt();
     if(Deg <= 90 && Deg >= -90)
+//    if(Deg <= 180 && Deg >= 0)
         emit takeDeg(Deg);
 }
 

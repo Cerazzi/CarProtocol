@@ -201,17 +201,15 @@ void QForm1::on_pushButton_clicked(){
     }
 }
 
-
 void QForm1::on_pushButton_3_clicked(){
     ui->plainTextEdit->clear();
 }
-
 
 void QForm1::on_pushButton_2_clicked(){
     uint8_t cmd, buf[24];
 //    _work w;
     int n;
-//    bool ok;
+    bool ok = false;
     QString strHex;
 
 
@@ -225,31 +223,33 @@ void QForm1::on_pushButton_2_clicked(){
     switch (cmd) {
         case ALIVE://ALIVE   PC=>MBED 0xF0 ;  MBED=>PC 0xF0 0x0D
             n = 1;
+            ok = true;
             break;
         case FIRMWARE://FIRMWARE   PC=>MBED 0xF1 ;  MBED=>PC 0xF1 FIRMWARE
             n = 1;
+            ok = true;
             break;
         case LEDS://LEDS   PC=>MBED 0x10 LEDS_A_MODIFICAR VALOR_LEDS ;  MBED=>PC 0x10 ESTADO_LEDS
             n = 3;
+            ok = true;
             break;
         case PULSADORES://PULSADORES   PC=>MBED 0x12 ;  MBED=>PC 0x12 VALOR PULSADORES
             n = 1;
+            ok = true;
             break;
         case SERVO://SERVO    PC=>MBED POSICIONAR_SERVO; MBED=>PC 0xA2 FIN_MOVIMIENTO_SERVO
             if(dialog->isHidden())
                 dialog->show();
-//            n = 2;
             break;
         default:
         ;
     }
-
-    if(n){
+    if(ok == true){
         buf[0] = cmd;
         SendCMD(buf, n);
+        ok = false;
     }
 }
-
 
 void QForm1::DecodeCmd(uint8_t *rxBuf){
     QString str;
@@ -288,12 +288,14 @@ void QForm1::DecodeCmd(uint8_t *rxBuf){
         ui->plainTextEdit->appendPlainText("NO CMD");
         break;
     case SERVO:
+        if(rxBuf[1] == ACKNOWLEDGE)
+            ui->plainTextEdit->appendPlainText("SERVO MOVED");
         break;
     }
 }
 
 void QForm1::servoDeg(uint8_t servDeg){
-    uint8_t buf[6];
+    uint8_t buf[2];
     buf[0] = SERVO;
     buf[1] = servDeg;
     SendCMD(buf, 2);
