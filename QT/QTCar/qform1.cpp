@@ -15,6 +15,7 @@ QForm1::QForm1(QWidget *parent)
     ui->comboBox_2->addItem("LEDS", 0x10);
     ui->comboBox_2->addItem("PULSADORES", 0x12);
     ui->comboBox_2->addItem("SERVO", 0xA2);
+    ui->comboBox_2->addItem("HC-SR04", 0xA3);
 
     header=0;
     connect(QSerialPort1,&QSerialPort::readyRead, this,&QForm1::OnRxChar);
@@ -241,6 +242,10 @@ void QForm1::on_pushButton_2_clicked(){
             if(dialog->isHidden())
                 dialog->show();
             break;
+        case DISTANCIA://HC-SR04   PC=>MBED LAST_DISTANCE; MBED=>PC ACKWNOWLEDGE;  MBED=>PC uInt32 DISTANCE_US
+            n = 1;
+            ok = true;
+            break;
         default:
         ;
     }
@@ -253,6 +258,7 @@ void QForm1::on_pushButton_2_clicked(){
 
 void QForm1::DecodeCmd(uint8_t *rxBuf){
     QString str;
+    _work w;
 
     switch (rxBuf[0]){
     case LEDS:
@@ -290,6 +296,16 @@ void QForm1::DecodeCmd(uint8_t *rxBuf){
     case SERVO:
         if(rxBuf[1] == ACKNOWLEDGE)
             ui->plainTextEdit->appendPlainText("SERVO MOVED");
+        break;
+    case DISTANCIA:
+        if(rxBuf[5] == ACKNOWLEDGE){
+            w.i32 = 0;
+            for(uint8_t i=1; i<5; i++){
+                w.u8[i-1] = rxBuf[i];
+            }
+//            ui->plainTextEdit->appendPlainText("DISTANCE: " + (QString("%1").arg(w.i32, 32, 10, QChar('0'))));
+//            ui->plainTextEdit->appendPlainText("DISTANCE: %1").arg(w.i32, 32, 10, QChar('0'));
+        }
         break;
     }
 }

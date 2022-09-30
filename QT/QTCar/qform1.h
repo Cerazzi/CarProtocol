@@ -65,6 +65,7 @@ private:
         LEDS=0x10,
         PULSADORES=0x12,
         SERVO=0xA2,
+        DISTANCIA=0xA3,
         ACKNOWLEDGE=0x0D,
         UNKNOWNCOMANND=0xFF
     }_eIDCommand;

@@ -4,7 +4,6 @@
 
 void OnRxchar(); //cada vez que recibe un caracter salta a esta interrupcion 
 int Decode(uint8_t index); //Me devuelve 1 si la cabecera va bien , 0 si hay algun error
-
 void decodeData(uint8_t index);
 
 typedef enum{
@@ -13,6 +12,7 @@ typedef enum{
     LEDS = 0x10,
     PULSADORES = 0x12,
     SERVO = 0xA2,
+    DISTANCIA = 0xA3
 } _eEstadoMEFcmd;
 
 typedef union{
@@ -28,6 +28,16 @@ typedef union{
     } bit;
     uint8_t byte;
 } _uflags;
+
+typedef union{
+    struct{
+        uint8_t byte1 : 8;
+        uint8_t byte2 : 8;
+        uint8_t byte3 : 8;
+        uint8_t byte4 : 8;
+    } bytesInt;
+    uint32_t int32b;
+}_uIntBytes;
 
 PwmOut servo(PA_8);
 DigitalOut LED(PC_13);
@@ -166,6 +176,7 @@ int Decode(uint8_t index){
 
 void decodeData(uint8_t index){
     uint8_t bufAux[20], indiceAux=0;
+    _uIntBytes distance;
     #define NBYTES  4
 
     bufAux[indiceAux++]='U';
@@ -202,6 +213,17 @@ void decodeData(uint8_t index){
         bufAux[indiceAux++]=0x0D;
         bufAux[indiceAux++]=0x0A;
         bufAux[NBYTES]=0x04;
+        break;
+    case DISTANCIA:
+        bufAux[indiceAux++]=DISTANCIA;
+        TRIGGER.write(10);
+        distance.int32b=ECHO.read();
+        bufAux[indiceAux++]=distance.bytesInt.byte1;
+        bufAux[indiceAux++]=distance.bytesInt.byte2;
+        bufAux[indiceAux++]=distance.bytesInt.byte3;
+        bufAux[indiceAux++]=distance.bytesInt.byte4;
+        bufAux[indiceAux++]=0x0D;
+        bufAux[NBYTES]=0x07;
         break;
     default:
         bufAux[indiceAux++]=0xFF;
