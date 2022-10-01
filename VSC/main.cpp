@@ -1,10 +1,13 @@
 #include "mbed.h"
 
-#define SERVO_MOVE  flags.bit.bit0
+#define SERVO_MOVE      flags.bit.bit0
+#define SOUND_MEDIDA    flags.bit.bit1
+#define WAIT_ECHO       flags.bit.bit2
 
 void OnRxchar(); //cada vez que recibe un caracter salta a esta interrupcion 
 int Decode(uint8_t index); //Me devuelve 1 si la cabecera va bien , 0 si hay algun error
 void decodeData(uint8_t index);
+void takeDistance();
 
 typedef enum{
     ALIVE = 0xF0,
@@ -12,8 +15,14 @@ typedef enum{
     LEDS = 0x10,
     PULSADORES = 0x12,
     SERVO = 0xA2,
-    DISTANCIA = 0xA3
+    HCSR04 = 0xA3
 } _eEstadoMEFcmd;
+
+typedef enum{
+    START = 0,
+    RISE = 1,
+    FALL = 2
+} _eTakeDistance;
 
 typedef union{
     struct{
@@ -30,19 +39,14 @@ typedef union{
 } _uflags;
 
 typedef union{
-    struct{
-        uint8_t byte1 : 8;
-        uint8_t byte2 : 8;
-        uint8_t byte3 : 8;
-        uint8_t byte4 : 8;
-    } bytesInt;
+    uint8_t int8b[4];
     uint32_t int32b;
 }_uIntBytes;
 
 PwmOut servo(PA_8);
 DigitalOut LED(PC_13);
 DigitalOut TRIGGER(PB_13);
-InterruptIn ECHO(PB_12);
+DigitalIn ECHO(PB_12);
 RawSerial Pc(PA_9, PA_10);
 BusIn Pulsadores(PA_4, PA_5, PA_6, PA_7);
 
@@ -51,10 +55,12 @@ volatile uint8_t txData[256],TindexW,TindexR;
 
 uint8_t ID, length, cks;
 
-uint32_t servoTime=0;
+uint32_t servoTime=0, echoTime=0, HCRTime=0, timeHRC1, timeHCR2;
 
 Timer myTimer;
 _uflags flags;
+_uIntBytes distanceHC;
+_eTakeDistance takeD = START;
 
 int main(){
     uint32_t move=0,counter=0,intervalo=100,mask=21;
@@ -72,7 +78,6 @@ int main(){
     servo.pulsewidth_us(500);
     wait_ms(350);
     servo.pulsewidth_us(1500);
-
 
     while(1){
         if((myTimer.read_ms()-counter)>intervalo){
@@ -97,7 +102,8 @@ int main(){
                 SERVO_MOVE = false;
             }
         }
-        
+
+        takeDistance();
     }
 }
 
@@ -176,7 +182,6 @@ int Decode(uint8_t index){
 
 void decodeData(uint8_t index){
     uint8_t bufAux[20], indiceAux=0;
-    _uIntBytes distance;
     #define NBYTES  4
 
     bufAux[indiceAux++]='U';
@@ -206,7 +211,7 @@ void decodeData(uint8_t index){
     case SERVO:
         bufAux[indiceAux++]=SERVO;
         if(SERVO_MOVE == false){
-            servo.pulsewidth_us(((((int8_t)rxData[index+1]) * 1000) / 90) + 1500);
+            servo.pulsewidth_us(((((int8_t)rxData[index+1]) * 100) / 9) + 1500);
             servoTime = myTimer.read_ms();
             SERVO_MOVE = true;
         }
@@ -214,16 +219,13 @@ void decodeData(uint8_t index){
         bufAux[indiceAux++]=0x0A;
         bufAux[NBYTES]=0x04;
         break;
-    case DISTANCIA:
-        bufAux[indiceAux++]=DISTANCIA;
-        TRIGGER.write(10);
-        distance.int32b=ECHO.read();
-        bufAux[indiceAux++]=distance.bytesInt.byte1;
-        bufAux[indiceAux++]=distance.bytesInt.byte2;
-        bufAux[indiceAux++]=distance.bytesInt.byte3;
-        bufAux[indiceAux++]=distance.bytesInt.byte4;
-        bufAux[indiceAux++]=0x0D;
-        bufAux[NBYTES]=0x07;
+    case HCSR04:
+        bufAux[indiceAux++]=HCSR04;
+        bufAux[indiceAux++]=distanceHC.int8b[0];
+        bufAux[indiceAux++]=distanceHC.int8b[1];
+        bufAux[indiceAux++]=distanceHC.int8b[2];
+        bufAux[indiceAux++]=distanceHC.int8b[3];
+        bufAux[NBYTES]=0x06;
         break;
     default:
         bufAux[indiceAux++]=0xFF;
@@ -236,4 +238,39 @@ void decodeData(uint8_t index){
         txData[TindexW++]=bufAux[i];
     }
     txData[TindexW++]=cks;
+}
+
+void takeDistance(){
+    if((myTimer.read_ms() - HCRTime) > 100){
+        HCRTime = myTimer.read_ms();
+        takeD = START;
+    }
+    switch (takeD){
+    case START:
+        if((myTimer.read_us()-echoTime)>10){
+            echoTime = myTimer.read_us();
+            if(TRIGGER.read() == true){
+                TRIGGER.write(false);
+                takeD = RISE;
+            } else {
+                TRIGGER.write(true);
+            }
+        }
+    break;
+    case RISE:
+        if(ECHO.read() == 1){
+            timeHRC1 = myTimer.read_us();
+            takeD = FALL;
+        }
+    break;
+    case FALL:
+        if(ECHO.read() == 0){
+            timeHCR2 = myTimer.read_us();
+            if(timeHCR2 > timeHRC1)
+                distanceHC.int32b = (timeHCR2 - timeHRC1)/58;
+            else 
+                distanceHC.int32b = (timeHCR2 - timeHRC1 + 0xFFFFFFFF)/58;
+        }
+    break;
+    }
 }

@@ -258,7 +258,7 @@ void QForm1::on_pushButton_2_clicked(){
 
 void QForm1::DecodeCmd(uint8_t *rxBuf){
     QString str;
-    _work w;
+    _uIntBytes w;
 
     switch (rxBuf[0]){
     case LEDS:
@@ -298,14 +298,10 @@ void QForm1::DecodeCmd(uint8_t *rxBuf){
             ui->plainTextEdit->appendPlainText("SERVO MOVED");
         break;
     case DISTANCIA:
-        if(rxBuf[5] == ACKNOWLEDGE){
-            w.i32 = 0;
-            for(uint8_t i=1; i<5; i++){
-                w.u8[i-1] = rxBuf[i];
-            }
-//            ui->plainTextEdit->appendPlainText("DISTANCE: " + (QString("%1").arg(w.i32, 32, 10, QChar('0'))));
-//            ui->plainTextEdit->appendPlainText("DISTANCE: %1").arg(w.i32, 32, 10, QChar('0'));
+        for(uint8_t i=1; i<5; i++){
+            w.int8b[i-1] = rxBuf[i];
         }
+            ui->plainTextEdit->appendPlainText("Distance: " + QString("%1 cm").arg(w.int32b/58, 4, 10, QChar('0')));
         break;
     }
 }
@@ -316,6 +312,3 @@ void QForm1::servoDeg(uint8_t servDeg){
     buf[1] = servDeg;
     SendCMD(buf, 2);
 }
-//w.i8 = QInputDialog::getInt(this, "SERVO", "Angulo:", 0, -90, 90, 1, &ok);
-//if(!ok)
-//  break;

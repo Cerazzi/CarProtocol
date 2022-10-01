@@ -69,5 +69,10 @@ private:
         ACKNOWLEDGE=0x0D,
         UNKNOWNCOMANND=0xFF
     }_eIDCommand;
+
+    typedef union{
+        uint8_t int8b[4];
+        uint32_t int32b;
+    }_uIntBytes;
 };
 #endif // QFORM1_H
